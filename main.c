@@ -9,7 +9,7 @@ int main(int argc, char *argv[]){
   double y = argc>3? atof(argv[3]) : -1;
   double gamma = argc>4? atof(argv[4]) : 0.00125;
   double epsilon = argc>5? atof(argv[5]) : 0.00001;
-  int max_iter = argc>6? atoi(argv[6]) : 10000;
+  int max_iter = argc>6? atoi(argv[6]) : 5;
   char * path = argc>7? argv[7] : "logs/rosenbrock.csv";
 
   FILE *fp = fopen(path, "w");
@@ -22,8 +22,8 @@ int main(int argc, char *argv[]){
   point[1] = y;
 
   double * res;
-  if (mode) res = conjugate_gradient(rosenbrock_grad, point, N, gamma, epsilon, max_iter, fp);
-  else res = gradient_descent(rosenbrock_grad, point, N, gamma, epsilon, max_iter, fp);
+  if (mode) res = gradient_descent(rosenbrock_grad, point, N, gamma, epsilon, max_iter, fp);
+  else res = conjugate_gradient(rosenbrock, rosenbrock_grad, point, N, epsilon, max_iter, fp);
 
   fclose(fp);
   return 0;
