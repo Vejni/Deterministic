@@ -125,8 +125,6 @@ double * conjugate_gradient(double (*func)(double *), void (*grad_func)(double *
 
     // Update Position
     for (j = 0; j < n; j++) x[j] += alpha * s[j];
-    printf("%f %f\n", x_prev[0], x_prev[1]);
-    printf("%f %f\n", x[0], x[1]);
 
     // Log
     error = calc_error(x, x_prev, n);
