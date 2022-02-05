@@ -23,28 +23,27 @@ double calc_norm(double * x, int n){
   return pow(total, 0.5);
 }
 
-double backtrack_search(double (*func)(double *), void (*grad_func)(double *, double *), double * x, double * grad, int n, double alpha, double beta, size_t max_iter){
+double backtrack_search(double (*func)(double *), double * grad, double * x0, double * dx, int n, double beta, size_t max_iter){
   double epsilon = 1.0;
-  double left, right;
+  double alpha = 0.5;
+  double prod = 0;
   size_t j, i = 0;
+  double * x;
+  if((x = (double *) malloc(n * sizeof(double))) == NULL) exit(1);
 
-  double * temp;
-  if((temp = (double *) malloc(n * sizeof(double))) == NULL) exit(1);
+  double fx0 = func(x0);
+  for (j = 0; j < n; j++){
+    x[j] = x0[j];
+    prod += grad[j] * dx[j];
+  }
 
-  do {
-    left = func(x);
 
-    grad_func(x, grad);
-    right = 0;
-    for (j = 0; j < n; j++) right += grad[j]*grad[j];
-    right *= alpha * epsilon;
-    for (j = 0; j < n; j++) temp[j] = x[j] - epsilon * grad[j];
-    right += func(temp);
-    printf("%f\n", func(temp));
-
+  while((func(x) > fx0 + alpha * epsilon * prod) && i < max_iter){
     epsilon *= beta;
+    for (j = 0; j < n; j++) x[j] = x0[j] + epsilon * dx[j];
     i++;
-  } while(left < right && i < max_iter);
+  }
+
   return epsilon;
 }
 
@@ -77,11 +76,13 @@ double * gradient_descent(void (*grad_func)(double *, double *), double * x, int
 }
 
 double * conjugate_gradient(double (*func)(double *), void (*grad_func)(double *, double *), double * x, int n, double epsilon, size_t max_iter, FILE * fp){
-  double alpha, error, beta, norm = DBL_MAX;
+  double alpha, error, beta, temp, norm = DBL_MAX;
   size_t j, i = 0;
 
-  double * p;
-  if((p = (double *) malloc(n * sizeof(double))) == NULL) exit(1);
+  double * dx;
+  if((dx = (double *) malloc(n * sizeof(double))) == NULL) exit(1);
+  double * s;
+  if((s = (double *) malloc(n * sizeof(double))) == NULL) exit(1);
   double * x_prev;
   if((x_prev = (double *) malloc(n * sizeof(double))) == NULL) exit(1);
   double * grad;
@@ -89,36 +90,52 @@ double * conjugate_gradient(double (*func)(double *), void (*grad_func)(double *
   double * grad_prev;
   if((grad_prev = (double *) malloc(n * sizeof(double))) == NULL) exit(1);
 
+  // Iteration 0
   grad_func(x, grad);
-  for (j = 0; j < n; j++) p[j] = -grad[j];
+  for (j = 0; j < n; j++) dx[j] = -grad[j];
+  alpha = backtrack_search(func, grad, x, dx, n, 0.5, max_iter);
+  for (j = 0; j < n; j++) {
+    x[j] += alpha * dx[j];
+    s[j] = dx[j];
+  }
 
   while (norm > epsilon && i < max_iter){
-    for (j = 0; j < n; j++) x_prev[j] = x[j];
-    for (j = 0; j < n; j++) grad_prev[j] = grad[j];
+    for (j = 0; j < n; j++) {
+      x_prev[j] = x[j];
+      grad_prev[j] = grad[j];
+    }
+
+    // Calculate Steepest Direction
+    grad_func(x, grad);
+    for (j = 0; j < n; j++) dx[j] = -grad[j];
+
+    // Get beta - RF
+    beta = 0;
+    for (j = 0; j < n; j++){
+       beta += grad[j] * grad[j];
+       temp += grad_prev[j] * grad_prev[j];
+     }
+    beta /= temp;
+
+    // Update Conjugate Direction
+    for (j = 0; j < n; j++) s[j] = dx[j] + beta * s[j];
 
     // Get alpha
-    alpha = backtrack_search(func, grad_func, x, grad, n, 0.3, 0.8, max_iter);
-    for (j = 0; j < n; j++) x[j] += alpha * p[j];
+    alpha = backtrack_search(func, grad, x, s, n, 0.5, max_iter);
 
-    grad_func(x, grad);
-
-    // Get beta
-    beta = 0;
-    for (j = 0; j < n; j++) beta += grad[j] * grad[j];
-    for (j = 1; j < n; j++) grad_prev[0] += grad_prev[j];
-    beta /= grad_prev[0];
-
-    // Get p
-    for (j = 0; j < n; j++) p[j] = -grad[j] + beta * p[j];
+    // Update Position
+    for (j = 0; j < n; j++) x[j] += alpha * s[j];
+    printf("%f %f\n", x_prev[0], x_prev[1]);
+    printf("%f %f\n", x[0], x[1]);
 
     // Log
     error = calc_error(x, x_prev, n);
     for (size_t j = 0; j < n; j++) fprintf(fp, "%f, ", x[j]);
-    fprintf(fp, "%f \n", error);
-    //printf("%f\n", error);
+    fprintf(fp, "%f, ", error);
 
     // Conditions
     norm = calc_norm(grad, n);
+    fprintf(fp, "%f \n", error);
     i++;
   }
 
